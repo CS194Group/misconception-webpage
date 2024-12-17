@@ -1,6 +1,9 @@
+import os
+import certifi
+os.environ['SSL_CERT_FILE'] = certifi.where()
+
 import dspy
 import sys
-import os
 import re
 import pdb
 
@@ -9,9 +12,10 @@ import pandas as pd
 
 from openai import OpenAI
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../src")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 from predict_model import ExchangeOfThought
-from agents import Agent
+from config import configure_dspy
+from agents import AdvancedAgent
 
 # initialize
 OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
@@ -101,14 +105,21 @@ class QuizApp:
         # Load custom CSS
         # self._load_custom_css()
 
+        self.round = 2
+        self.mode = "Report"
+
+        configure_dspy(dspy)
         # Set up Agents
-        agent_a = Agent(name="Agent A")
-        agent_b = Agent(name="Agent B")
-        agent_c = Agent(name="Agent C")
+        agent_a = AdvancedAgent(name="Agent A", persona_promt=None)
+        agent_b = AdvancedAgent(name="Agent B", persona_promt=None)
+        agent_c = AdvancedAgent(name="Agent C", persona_promt=None)
+        agent_d = AdvancedAgent(name="Agent D", persona_promt=None)
+        agent_e = AdvancedAgent(name="Agent E", persona_promt=None)
 
         # evaluate
-        self.model = ExchangeOfThought(agent_a, agent_b, agent_c, rounds=3, mode="Report")
-        self.model.load('./compiled_model.pkl')
+        self.model = ExchangeOfThought(
+            agent_a, agent_b, agent_c, agent_d, agent_e, rounds=self.round, mode=self.mode)
+        # self.model.load('./compiled_model.dspy')
 
         # Load data
         self.data = pd.read_csv(q_data_path)
@@ -152,6 +163,8 @@ class QuizApp:
                 "D": self._wrap_latex(current_row['AnswerDText'])
             },
             'correct_answer': current_row.get('CorrectAnswer', 'A'),
+            'construct_name': current_row['ConstructName'],
+            'subject_name': current_row['SubjectName'],
             'misconceptions': {
                 "A": current_row.get('MisconceptionAId'),
                 "B": current_row.get('MisconceptionBId'),
@@ -386,41 +399,52 @@ class QuizApp:
             self._ini_miscon(misconception_container[option], option)
 
         # Get answer from gpt and our model
-        pred = self.model(question['question_text'])
 
         if st.session_state.answer_submitted:
+            pred = self.model(QuestionText=question['question_text'], 
+                    AnswerText=question['options'][st.session_state.selected_option], 
+                    CorrectAnswer=question['options'][question['correct_answer']], 
+                    ConstructName=question['construct_name'], 
+                    SubjectName=question['subject_name'])
             for option in ['A', 'B', 'C', 'D']:
                 self._update_miscon(misconception_container[option], misconception[option], option)
 
-            misconception_pattern = r"(?:'A':|'B':|'C':|'D':)\s*(?:(?:'Misconception:\s*(.*?)')|NaN)"
-            matches = re.findall(misconception_pattern, pred.answer)
+            # misconception_pattern = r"(?:'A':|'B':|'C':|'D':)\s*(?:(?:'Misconception:\s*(.*?)')|NaN)"
+            # matches = re.findall(misconception_pattern, pred)
 
-            result = []
-            for i, match in enumerate(matches):
-                option = chr(65 + i)
-                if match:
-                    result.append(f"{option}: {match}")
-                else:
-                    result.append(f"{option}: This options has no apparent misconception.")
+            # result = []
+            # for i, match in enumerate(matches):
+            #     option = chr(65 + i)
+            #     if match:
+            #         result.append(f"{option}: {match}")
+            #     else:
+            #         result.append(f"{option}: This options has no apparent misconception.")
 
             # Misconception dictionary with more detailed descriptions
+            # misconception_dict = {
+            #     "A": {
+            #         "text": question['options']['A'],
+            #         "explanation": result[0]
+            #     },
+            #     "B": {
+            #         "text": question['options']['B'],
+            #         "explanation": result[1]
+            #     },
+            #     "C": {
+            #         "text": question['options']['C'],
+            #         "explanation": result[2]
+            #     },
+            #     "D": {
+            #         "text": question['options']['D'],
+            #         "explanation": result[3]
+            #     }
+            # }
+
             misconception_dict = {
-                "A": {
-                    "text": question['options']['A'],
-                    "explanation": result[0]
+                f"{st.session_state.selected_option}": {
+                    "text": question['options'][st.session_state.selected_option],
+                    "explanation": pred
                 },
-                "B": {
-                    "text": question['options']['B'],
-                    "explanation": result[1]
-                },
-                "C": {
-                    "text": question['options']['C'],
-                    "explanation": result[2]
-                },
-                "D": {
-                    "text": question['options']['D'],
-                    "explanation": result[3]
-                }
             }
 
             selected_misconception = self.create_misconception_display(misconception_dict)

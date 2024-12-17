@@ -1,6 +1,9 @@
+import os
+import certifi
+os.environ['SSL_CERT_FILE'] = certifi.where()
+
 import dspy
 import sys
-import os
 import pdb
 
 import streamlit as st
@@ -9,15 +12,17 @@ from openai import OpenAI
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../src")))
 from predict_model import ExchangeOfThought
-from agents import Agent
+from config import configure_dspy
+from agents import AdvancedAgent
 
 class QuizApp:
     def __init__(self):
+
         """Initialize the quiz application with modern styling."""
         # Configure page with wider layout
         self._setup_page_config()
 
-        # st.set_page_config(page_title="Chat Playground", page_icon="🤖")
+        configure_dspy(dspy)
         OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
         self.client = OpenAI(
             api_key = OPENAI_API_KEY,
@@ -30,22 +35,25 @@ class QuizApp:
 
         # Load custom CSS
         self._load_custom_css()
+        self.round = 2
+        self.mode = "Report"
 
         # Set up Agents
         lm = dspy.LM('openai/gpt-3.5-turbo')
         dspy.configure(lm=lm)
-        agent_a = Agent(name="Agent A")
-        agent_b = Agent(name="Agent B")
-        agent_c = Agent(name="Agent C")
-        self.model = ExchangeOfThought(agent_a, agent_b, agent_c, rounds=3, mode="Report")
+        agent_a = AdvancedAgent(name="Agent A", persona_promt=None)
+        agent_b = AdvancedAgent(name="Agent B", persona_promt=None)
+        agent_c = AdvancedAgent(name="Agent C", persona_promt=None)
+        agent_d = AdvancedAgent(name="Agent D", persona_promt=None)
+        agent_e = AdvancedAgent(name="Agent E", persona_promt=None)
+        self.model = ExchangeOfThought(
+            agent_a, agent_b, agent_c, agent_d, agent_e, rounds=self.round, mode=self.mode)
 
-        self.option_a = ''
-        self.option_b = ''
-        self.option_c = ''
-        self.option_d = ''
+        self.correct_answer = ''
+        self.misconception_answer = ''
 
         # evaluate
-        self.model.load('./compiled_model.pkl')
+        # self.model.load('./compiled_model.dspy')
 
     def _setup_page_config(self):
         """Configure page settings and style."""
@@ -209,10 +217,8 @@ class QuizApp:
         with col2:
             st.markdown("#### 🔍 Multiple Choice Options")
             with st.container(border=True):
-                self.option_a = st.text_input("Option A", key="option_a")
-                self.option_b = st.text_input("Option B", key="option_b")
-                self.option_c = st.text_input("Option C", key="option_c")
-                self.option_d = st.text_input("Option D", key="option_d")
+                self.correct_answer = st.text_input("Correct Answer", key="correct_answer")
+                self.misconception_answer = st.text_input("Misconception Answer", key="misconception_answer")
 
         # Misconception section
         st.markdown("## 💡 Misconception Analysis")
@@ -225,19 +231,20 @@ class QuizApp:
                 # Prepare full question with options
                 full_question = f"""
                 Question: {user_question}
-                Options:
-                A: {self.option_a}
-                B: {self.option_b}
-                C: {self.option_c}
-                D: {self.option_d}
+                Correct Options: {self.correct_answer}
+                Misconception Options: {self.misconception_answer}
 
-                Please analyze and provide misconceptions of all the options, skip if there's no option provided.
+                Based on the Question and the Correct Options. Please analyze and provide misconceptions of the Misconception options.
                 """
 
                 try:
                     # Analyze misconceptions
-                    pred_p = self.model(full_question)
-                    self._update_miscon(misconception_container, pred_p.answer, 'Misconception Insights')
+                    pred_p = self.model(QuestionText=full_question, 
+                                        AnswerText=self.misconception_answer, 
+                                        CorrectAnswer=self.correct_answer, 
+                                        ConstructName=None, 
+                                        SubjectName=None)
+                    self._update_miscon(misconception_container, pred_p, 'Misconception Insights')
 
                     # Chat functionality
                     if full_question:

@@ -90,7 +90,7 @@ def main():
 
     st.info("🕵️ Explore and Identify Mathematical Misconceptions! Select a scenario to uncover hidden reasoning errors.")
 
-    st.balloons()
+    # st.balloons()
     # st.snow()
     st.success("Navigate through different misconceptions using the radio buttons below.")
 
@@ -118,13 +118,13 @@ def main():
     with col1:
         # Image selection for first column
         st.markdown("<div class='image-container'>", unsafe_allow_html=True)
-        robo_selected = st.image("./app/images/robo.webp", width=1000, output_format="auto")
+        robo_selected = st.image("./images/robo.webp", width=1000, output_format="auto")
         st.markdown("</div>", unsafe_allow_html=True)
 
     with col2:
         # Image selection for second column
         st.markdown("<div class='image-container'>", unsafe_allow_html=True)
-        chat_selected = st.image("./app/images/chat.png", width=1000, output_format="auto")
+        chat_selected = st.image("./images/chat.png", width=1000, output_format="auto")
         st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("---")
